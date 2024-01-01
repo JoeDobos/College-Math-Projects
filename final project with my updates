@@ -1,0 +1,358 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Apr 22 19:42:55 2021
+
+@author: josephdobos
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Apr 22 18:14:36 2021
+
+@author: josephdobos
+"""
+
+import random
+import logging
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy
+from scipy import stats
+from scipy.stats import norm
+import seaborn as sns
+
+log = logging.getLogger("my-logger")
+log.setLevel("DEBUG")
+#log.setLevel("INFO")
+#random.seed(4428) ##makes it reproducible
+class Card:
+    suits = ['C', 'D', 'H', 'S']  # Clubs,Diamonds,Hearts,Spades
+    ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
+    value = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11]
+
+    def __init__(self, suit=0, rank=0):
+        """Default constructor """
+        self.suit = suit
+        self.rank = rank
+
+    def get_rank(self):
+        return self.rank
+
+    def get_suit(self):
+        return self.suit
+
+    def get_value(self):
+        return self.value[self.rank]
+
+    def __str__(self):
+        """Returns a human-readable string representation """
+        return '%s:%s' % (Card.ranks[self.rank], Card.suits[self.suit])
+        
+
+    def __lt__(self, other):
+        """Overriding < operator """
+        t1 = self.rank, self.suit
+        t2 = other.rank, other.suit
+        return t1 < t2
+
+class Deck:
+    def __init__(self, deck_count):
+        """Initializes the Deck with 52 cards."""
+        self.shuffle_count = 0
+        self.cards = []
+        self.discard_pile = []
+        for decks in range(deck_count):
+            for suit in range(4):
+                for rank in range(13):
+                    card = Card(suit, rank)
+                    self.cards.append(card)
+        self.shuffle()
+
+    def __str__(self):
+        """Returns a string representation of the deck."""
+        res = []
+        for card in self.cards:
+            res.append(str(card))
+        return ', '.join(res)
+
+    def __len__(self):
+        """Overriding len operator"""
+        return len(self.cards)
+
+    def add_card(self, card):
+        """Adds a card to the deck."""
+        self.cards.append(card)
+
+    def pop_card(self, i=-1):
+        """Removes and returns a card from the deck.
+        i: index of the card to pop; by default, pops the last card.
+        """
+        card = None
+        while(card is None):
+            try:
+                card = self.cards.pop()
+            except IndexError:
+                self.cards = self.discard_pile.copy()
+                self.discard_pile = []
+                self.shuffle()
+        return card
+
+    def discard(self, card):
+        self.discard_pile.append(card)
+
+    def shuffle(self):
+        """Shuffles the cards in this deck."""
+        random.shuffle(self.cards)
+        self.shuffle_count += 1
+        #print("Shuffle %d/cards %d" % (self.shuffle_count, len(self.cards)))
+        log.debug("Shuffle %d/cards %d" % (self.shuffle_count, len(self.cards)))
+
+    def get_shuffle_count(self):
+        return self.shuffle_count
+    
+    def get_card_count(self):
+        return len(self.cards)
+
+    def sort(self):
+        """Sorts the cards in ascending order."""
+        self.cards.sort()
+
+
+class Hand():
+    """Represents a hand of playing cards."""
+
+    def __init__(self, deck ):
+        self.cards = []
+        self.deck = deck
+        self.wincount = 0
+
+    def get_score(self, low_ace):
+        score = 0
+        for card in self.cards:
+            value = card.get_value()
+            if low_ace and value == 11:
+                value = 1
+            score += value
+        return score
+
+    def add_card(self, card):
+        """Adds a card to the deck."""
+        self.cards.append(card)
+
+    def discard(self):
+        for card in self.cards:
+            self.deck.discard(card)
+        self.cards = []
+
+    def ace_in_hand(self):
+        aces = False
+        for card in self.cards:
+            if card.get_value() == 11:
+                aces = True
+        return aces
+
+    def __str__(self):
+        #return "Deck.__str__(self)
+        return " is " + Deck.__str__(self)
+
+    def __len__(self):
+        return len(self.cards)
+
+class Play(): 
+    def __init__(self, deck):
+        self.pScore = 0
+        self.dScore = 0
+        self.deck = deck
+        self.player_hand = Hand(self.deck)  # add player
+        self.dealer_hand = Hand(self.deck)  # add dealer
+
+    def play_hand(self):
+
+        # Initial Hand
+        self.player_hand.add_card(self.deck.pop_card())  
+        self.dealer_hand.add_card(self.deck.pop_card())  
+        self.player_hand.add_card(self.deck.pop_card())  
+        self.dealer_hand.add_card(self.deck.pop_card())  
+      
+
+        blackjack = False
+        low_ace = False
+
+        # player play
+        self.pScore = self.player_strat(low_ace)
+        if self.pScore == 21 and len(self.player_hand) == 2:
+            blackjack = True
+        elif self.pScore > 21 and self.player_hand.ace_in_hand():
+            log.debug("ACE=1")
+            low_ace = True # try with aces = 1
+            self.pScore = self.player_strat(low_ace)
+
+        # dealer play
+        self.dScore = self.dealer_strat(blackjack, low_ace)
+        if self.dScore > 21 and self.player_hand.ace_in_hand():
+            low_ace = True # try with aces = 1
+            self.pScore = self.player_strat(low_ace)
+        self.player_hand.discard()
+        self.dealer_hand.discard()
+
+        # calculate win/loss
+        win = 0
+        if blackjack: # blackjack
+            log.debug("BlackJack!!!!")
+            if self.dScore == 21: #blackjack push
+                win = 0
+            else:
+                win = 1.5 # blackjack win!
+        elif self.pScore > 21: # player bust
+                win = -1
+        elif self.dScore > 21: # dealer bust
+                win = 1
+        elif self.pScore > self.dScore: # player high score
+                win = 1
+        elif self.pScore == self.dScore: # push
+                win = 0
+        elif self.pScore < self.dScore: # dealer high score
+                win = -1
+          
+        log.debug("winnings=%.1f" % win)
+        log.debug("")
+        return(win)
+
+    def player_strat(self, low_ace):
+        STAY_ON = 16
+        ##COULD CHANGE THIS-- SAY STAY ON 16, 17, 18
+        log.debug("PLAYER ")
+        while(True):
+            score = self.player_hand.get_score(low_ace)
+            log.debug(score)
+            if score < STAY_ON:
+                log.debug(' hit ')
+                self.player_hand.add_card(self.deck.pop_card())
+            elif score <= 21:
+                log.debug(' stand ')
+                return(score)
+            else:
+                log.debug(' bust ')
+                return(score)
+
+    def dealer_strat(self, blackjack, low_ace):
+        log.debug("DEALER ")
+        if blackjack:
+            score = self.dealer_hand.get_score(low_ace)
+            return(score)
+
+        while(True): ##WHILE WHAT IS TRUE??
+            score = self.dealer_hand.get_score(low_ace)
+            log.debug(score)
+            if score < 17:
+                log.debug(' hit ')
+                self.dealer_hand.add_card(self.deck.pop_card())
+            elif score <= 21:
+                log.debug(' stand')
+                return(score)
+            else:
+                log.debug(' bust')
+                return(score)
+
+
+class Sim():
+    def __init__(self, decks, rounds, bet):
+        self.deck = Deck(decks)
+        self.rounds = rounds
+        self.bet = bet
+        self.game = Play(self.deck)
+        
+    # def bet(self):
+    #     ###see above 
+    #     return 2.0
+    
+    def monte_carlo(self):
+        winnings = 0.0
+        hands = 0
+        while True:
+            winnings += self.bet * self.game.play_hand()
+            ## ADD OTHER BETTING STRATEGIES HERE
+            hands += 1
+            if self.deck.get_shuffle_count() > self.rounds:
+                return winnings, hands
+
+    def monte_carlo_histogram(self):
+        winnings = 0.0
+        hands = 0
+        while True:
+            winnings += self.bet * self.game.play_hand()
+            ## OR ADD OTHER BETTING STATEGIES HERE
+            hands += 1
+            if self.deck.get_shuffle_count() > self.rounds:
+                return winnings, hands
+            
+if __name__ == '__main__':
+    DECKS = 2           # number of decks
+    SHUFFLE_START = 12 # max number of shuffles per simulation
+    SHUFFLE_STOP = 500#500  # Max shuffles
+    STARTING_PLAYER_BANK = 50 #idk what I am tryna do here
+    PLAYER_BET_FIRST = 2.0
+    PLAYER_BET = 2.00    # player bet in dollars
+    PLOTTING = False   # plot graph
+    HISTOGRAM = True   # plot histogram
+    
+    ax = []
+    ay = []
+    
+
+    if PLOTTING: # SHUFFLE_START to SHUFFLE_STOP
+        print("Winnings/Shuffles/Hands/AveWin")
+        for shuffles in range(SHUFFLE_START, SHUFFLE_STOP + 1):
+            simulation = Sim(DECKS, shuffles, PLAYER_BET)
+            wins, hands = simulation.monte_carlo()
+            print("%.1f,%d,%d,%f" % (wins, shuffles, hands, wins/hands))
+        
+            ax.append(shuffles)
+            ay.append(wins/hands)
+        avg_winnings = np.average(ay)
+        # Plot Graph         plt.title("Win/Hand vs Shuffles")
+        plot01 = plt.figure(1)
+        plt.xlabel('Shuffles')
+        plt.ylabel("Win/Hand ($)")
+        plt.plot(ax, ay)
+        plt.axhline(y = avg_winnings, color = 'r', linestyle = '-')
+        plt.savefig('./plot_%d.png' % SHUFFLE_STOP)
+        plt.show()
+        print('avg winnings: ', avg_winnings)
+ 
+    if HISTOGRAM:
+        SHUFFLES = 20 #200
+        print("Winnings/Shuffles/Hands/AveWin")
+        RUNS = 5000 #500
+        x = np.zeros(RUNS)
+        print(type(x))
+        for run in range(RUNS):
+            simulation = Sim(DECKS, SHUFFLES, PLAYER_BET)
+            wins, hands = simulation.monte_carlo()
+            x[run] = wins/hands
+            print("%d,%.1f,%d,%d,%f" % (run, wins, SHUFFLES, hands, wins/hands))
+        avg_winnings = np.average(x)
+        #print(avg_winnings)
+        # Plot Graph         
+        plot02 = plt.figure(2)
+        plt.title("Wins/Hand Distribution shuffles:%d, runs%d" % (SHUFFLES, RUNS))
+        plt.xlabel("Win/Hand ($)")
+        plt.hist(x, bins = 50)
+        plt.axvline(x = avg_winnings, color = 'r')
+        plt.savefig('./histogram_%d_%d.png' % (SHUFFLES, RUNS))
+        mu, sigma = scipy.stats.norm.fit(x) ##calculates mean and standard deviation
+        print('mu, sigma', mu, sigma) ##prints mean and standard deviation
+        #best_fit_line = scipy.stats.norm.pdf(mu, sigma)
+        #print(best_fit_line)
+        #plt.plot(best_fit_line)
+        #sns.displot(x, kind = 'kde') ##kernel density estimation
+        plt.show()
+        
+       
+        
+## if you place a two dollar bet and you win, you get $1.00. 
+## you now have $3.00
+##Suppose
+        

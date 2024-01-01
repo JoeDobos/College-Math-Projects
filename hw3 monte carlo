@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Apr 22 14:56:35 2021
+
+@author: josephdobos
+"""
+
+import random 
+
+def roll():
+    outcome_lst = []
+    for i in range(100):
+        d1 = random.randint(1,6)
+        d2 = random.randint(1,6)    
+        outcome_lst.append(d1+d2)
+    return(outcome_lst)
+
+def bucket(b):
+    ##b: number of trials consisting of 100 rolls
+    lst = []
+    for i in range(b):
+        outcome = roll()
+        lst.append(outcome)
+    #print(lst)
+    return(lst)
+        
+
+def count(x,b):
+    ##b: number of 100 dice roll trials
+    ##x: number of interest
+    outcomes = bucket(b)
+    #print(outcomes)
+    count = 0 ##counts the number of five consecutive occurences
+    for i in range(len(outcomes)):
+        for j in range(len(outcomes[i])):
+            #print(outcomes[i][j])
+            if outcomes[i][j] == x and outcomes[i][j+1] == x and outcomes[i][j+2] == x and outcomes[i][j+3] == x and outcomes[i][j+4] == x:
+                count += 1
+    return(count)       
+        
+
+# def get_prob(x, b):
+#     ##x: number of interest
+#     ##b: number of simulations
+#     flag = 0 ##counts the total number of times you observe a consecutive occurence
+#     ##of x in b simulations of n dice rolls
+#     blank = []
+#     for i in range(b):
+#         num_cons_occurences = count(x, b)
+#         if num_cons_occurences >= 1:
+#             blank.append(num_cons_occurences)
+#     print(blank)
+#     for ele in blank:
+#         flag += ele 
+#     print('# of flags: ' , flag)
+#     tot_rolls = 100 * b
+#     prob = flag/tot_rolls
+#     return(prob)
+
+def get_prob(x, b):
+    num_occurence = count(x, b)
+    tot_num = 100 * b
+    prob = num_occurence / tot_num
+    return(prob)
+    
+    
+    

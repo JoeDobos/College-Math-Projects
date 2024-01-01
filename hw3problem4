@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Apr 26 15:14:31 2021
+
+@author: josephdobos
+"""
+
+import random 
+
+def roll(n): #n is number of trials
+    counter = 0
+    count_lst = [] #counts number of occurences of sum of 7
+    outcome_lst = [2, 3, 4, 5, 6, 7, 8, 9 , 10, 11, 12]
+    blank = []
+    polished = []
+    prob_seven = float(1/6)
+    prob_other = float((1-prob_seven)/10)
+    weights_lst = [prob_other, prob_other, prob_other, prob_other, prob_other, prob_seven, 
+                        prob_other, prob_other, prob_other, prob_other, prob_other]
+    for i in range(n):
+        blank.append(random.choices(outcome_lst, weights_lst))
+    
+    for j in range(len(blank)):
+        polished.append(blank[j][0])
+    #print('results', polished)
+    
+    for k in range(len(polished)):
+        if polished[k] == 7: 
+            counter += 1
+            count_lst.append(1)
+        else:
+            counter = 0
+            count_lst.append(0)
+    #print('counter list: ', count_lst)
+    #print(counter)
+    #return(counter, int(outcome[0]))
+    return(polished)
+    
+def sim(n): #n is number of rolls
+    five_cons = 0
+    five_cons_occurrences = []
+    for i in range(n):
+        result = roll(n)
+        print(result)
+        for j in range(len(result)):
+            if result[j] == 7 and result[j+1] == 7 and result[j+2] == 7 and result[j+3] == 7 and result[j+4]==7:
+                five_cons += 1
+                five_cons_occurrences.append(1)
+            else: 
+                five_cons += 0
+                five_cons_occurrences.append(0)
+    #print('total number of 5-in-a-row occurences: ', five_cons)
+    #print('Anywhere you see a one means we had 5 cons occurrences: ', five_cons_occurrences)
+    return(five_cons)
+
+def runs(n): #100: number of simulations of n rolls
+    trials = 100*n
+    for i in range(100):
+        conclusion = sim(n)
+    probability = conclusion/trials
+    #print(conclusion)
+    print('prob: ', probability)
+    return(probability)
+
+
+        
+
+    
+    
